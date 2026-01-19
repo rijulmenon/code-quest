@@ -6,20 +6,20 @@ CodeQuest is a Django-based backend platform designed with a production-level ar
 
 This project is aimed at understanding real-world backend workflows, including task queues, caching, reverse proxy servers, and distributed systems.
 
-DYNAMIC LOG IN PAGE:
+## DYNAMIC LOG IN PAGE:
 <img width="452" height="245" alt="image" src="https://github.com/user-attachments/assets/292c95af-e31b-4ff7-9c4b-b727913c51bc" />
 
-HOME PAGE:
+## HOME PAGE:
 <img width="452" height="282" alt="image" src="https://github.com/user-attachments/assets/5c88138a-0f5e-472f-bba8-c8bffbb20977" />
 
-IF USER EXITS THE FULL SCREEN:
+## IF USER EXITS THE FULL SCREEN:
 <img width="452" height="149" alt="image" src="https://github.com/user-attachments/assets/c0f93d0d-1155-4c8e-b285-8e8afb8e6791" />
 
-QUESTION FORMAT:
+## QUESTION FORMAT:
 <img width="452" height="515" alt="image" src="https://github.com/user-attachments/assets/d1fff5ae-bf6d-4499-ad2f-20eaa7249f5c" />
 <img width="452" height="229" alt="image" src="https://github.com/user-attachments/assets/0c02a011-5de0-400c-88f1-2719bd946e41" />
 
-THE ADMIN INTERFACE:
+## THE ADMIN INTERFACE:
 <img width="452" height="304" alt="image" src="https://github.com/user-attachments/assets/959063d4-b6da-4491-b693-ceb9dc4e04d1" />
 
 Tech Stack
