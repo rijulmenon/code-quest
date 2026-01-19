@@ -6,6 +6,10 @@ CodeQuest is a Django-based backend platform designed with a production-level ar
 
 This project is aimed at understanding real-world backend workflows, including task queues, caching, reverse proxy servers, and distributed systems.
 
+<img width="452" height="245" alt="image" src="https://github.com/user-attachments/assets/292c95af-e31b-4ff7-9c4b-b727913c51bc" />
+
+
+
 Tech Stack
 Backend Framework: Django
 Task Queue: Celery
