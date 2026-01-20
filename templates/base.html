@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en" dir="ltr">
+  <head>
+    {% block extra_head %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/theme/monokai.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/mode/python/python.min.js"></script>
+    <script>
+      // Set Ace's base path
+      ace.config.set('basePath', 'https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/');
+    </script>
+    {% endblock %}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="{% static 'css/home.css' %}">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <title>{% block title %}Code Quest{% endblock %}</title>
+    <style>
+      body {
+        background-color: rgb(60, 100, 119);
+        color: rgb(255, 255, 255);
+      }
+
+      .container, .container-fluid {
+        background-color: rgb(60, 100, 119);
+      }
+
+      .navbar {
+        background-color: #000000 !important;
+      }
+
+      .navbar-light .navbar-brand,
+      .navbar-light .navbar-nav .nav-link {
+        color: rgb(254, 254, 255) !important;
+      }
+
+      .card, .list-group-item {
+        background-color: rgb(0, 0, 0);
+        color: white;
+        border-color: #444;
+      }
+
+      .btn-light {
+        background-color: #444;
+        border-color: #555;
+        color: white;
+      }
+
+      .btn-light:hover {
+        background-color: #555;
+        border-color: #666;
+        color: white;
+      }
+
+      .footer {
+        background-color: rgb(60, 100, 119) !important;
+        color: white;
+      }
+
+      body.fullscreen-mode #main-nav,
+      body.fullscreen-mode .footer {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light" id="main-nav">
+      <a class="navbar-brand" href="{% url 'home' %}">Code Quest</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <div class="navbar-nav ml-auto">
+          {% if user.is_authenticated %}
+            <span class="nav-item nav-link">Hello, {{ user.username }}</span>
+            <a class="nav-item nav-link" href="{% url 'logout' %}">Logout</a>
+          {% else %}
+            <a class="nav-item nav-link" href="{% url 'login' %}">Login</a>
+            <a class="nav-item nav-link" href="{% url 'signup' %}">Sign Up</a>
+          {% endif %}
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mt-4">
+      {% if messages %}
+      <ul class="messages list-unstyled">
+          {% for message in messages %}
+          <li{% if message.tags %} class="alert alert-{{ message.tags }}"{% endif %}>{{ message }}</li>
+          {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% block content %}
+      {% endblock %}
+    </div>
+
+    <footer class="footer mt-auto py-3 bg-light">
+      <div class="container text-center">
+        <span class="text-muted">© 2024 Code Quest. All rights reserved.</span>
+      </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', (event) => {
+        const body = document.body;
+
+        function toggleFullscreenMode(enabled) {
+            if (enabled) {
+                body.classList.add('fullscreen-mode');
+                // Disable right-click
+                document.addEventListener('contextmenu', disableContextMenu);
+                // Detect tab switching
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+            } else {
+                body.classList.remove('fullscreen-mode');
+                // Enable right-click
+                document.removeEventListener('contextmenu', disableContextMenu);
+                // Stop detecting tab switching
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }
+        }
+
+        function disableContextMenu(event) {
+            event.preventDefault();
+        }
+
+        function handleVisibilityChange() {
+            if (document.hidden) {
+                alert('You have switched tabs. Please stay on the current tab.');
+            }
+        }
+
+        function checkFullscreen() {
+            const isFullscreen = localStorage.getItem('fullscreen') === 'true';
+            toggleFullscreenMode(isFullscreen);
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                localStorage.setItem('fullscreen', 'false');
+                toggleFullscreenMode(false);
+            }
+        });
+
+        // Check fullscreen state on load
+        checkFullscreen();
+    });
+    </script>
+  </body>
+</html>

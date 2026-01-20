@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Full Code for Submission {{ submission.id }}</h1>
+<p>User: {{ submission.user.username }}</p>
+<p>Question: {{ submission.question.title }}</p>
+<p>Status: {% if submission.is_correct %}
+             <span style="color: green;">Correct</span>
+           {% else %}
+             <span style="color: red;">Incorrect</span>
+           {% endif %}
+</p>
+<p>Execution Time: {{ submission.execution_time|floatformat:3 }} seconds</p>
+<p>Submitted At: {{ submission.submitted_at }}</p>
+<h2>Code:</h2>
+<pre><code>{{ submission.code }}</code></pre>
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!DOCTYPE html>
+{% load static %}
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="{% static 'css/home.css' %}">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
+    <title>{{ question.title }} - Code Quest</title>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="row" style="background-color:black;">
+        <div class="col-sm-12" style="font-family:'Comic Sans MS'; font-size: 50px; color:white; letter-spacing: 3px;">
+          <center>Code Quest</center>
+        </div>
+      </div>
+    </div>
+    <div class="container mt-5">
+      <a href="{% url 'home' %}" class="btn btn-secondary mb-3">Back to Questions</a>
+      <h1>{{ question.title }}</h1>
+      
+      <div class="row mb-4">
+        <!-- Question Details (Left) -->
+        <div class="col-md-6">
+          <h3>Description</h3>
+          <p>{{ question.description }}</p>
+          <h3>Input Format</h3>
+          <p>{{ question.input_format }}</p>
+          <h3>Output Format</h3>
+          <p>{{ question.output_format }}</p>
+          <h3>Sample Input</h3>
+          <pre><code>{{ question.sample_input }}</code></pre>
+          <h3>Sample Output</h3>
+          <pre><code>{{ question.sample_output }}</code></pre>
+        </div>
+        
+        <!-- Input and Output Area (Right) -->
+        <div class="col-md-6">
+          <h3>Input</h3>
+          <div id="input-area" class="mb-4">
+            <textarea id="input" name="input_area" class="form-control" rows="5" placeholder="Enter your input here (e.g., '3 5' for two numbers)">{{ input_data }}</textarea>
+          </div>
+          
+          <h3>Output</h3>
+          <div id="output-area">
+              <pre id="output">{{ output }}</pre>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Code Input Area (Bottom) -->
+      <div class="row">
+        <div class="col-12">    
+          <h3>Your Solution</h3>
+          <form id="codeForm" method="post" action="{% url 'question_detail' question.id %}">
+            {% csrf_token %}
+            <div class="form-group">
+              <label for="code_area">Your Code:</label>
+              <textarea id="code_area" class="form-control" rows="14" name="code_area" style="border:1px solid grey; letter-spacing: 1px; font-family: 'Lucida Console'; font-size: 20px;">{{ submission.code }}</textarea>
+            </div>
+            <div class="form-group">
+              <button class="btn btn-success" type="submit">Save Code</button>
+            </div>
+          </form>
+
+          <form id="runForm" method="post" action="{% url 'runcode' question.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="code_area" id="run_code_area">
+            <input type="hidden" name="input_area" id="run_input_area">
+            <button class="btn btn-primary" type="submit" onclick="copyCodeAndInput()">Run Code</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script>
+    function copyCodeAndInput() {
+      document.getElementById('run_code_area').value = document.getElementById('code_area').value;
+      document.getElementById('run_input_area').value = document.getElementById('input').value;
+    }
+
+    document.getElementById('code_area').addEventListener('keydown', function(e) {
+        if (e.key == 'Tab') {
+            e.preventDefault();
+            var start = this.selectionStart;
+            var end = this.selectionEnd;
+    
+            // Set textarea value to: text before caret + tab + text after caret
+            this.value = this.value.substring(0, start) +
+              "    " + this.value.substring(end);
+    
+            // Put caret at right position again
+            this.selectionStart =
+            this.selectionEnd = start + 4;
+        }
+        
+        if (e.key == 'Enter') {
+            e.preventDefault();
+            var start = this.selectionStart;
+            var end = this.selectionEnd;
+            var lines = this.value.substr(0, start).split("\n");
+            var currentLine = lines[lines.length - 1];
+            var indent = currentLine.match(/^\s*/)[0];
+            
+            if (currentLine.trim().endsWith(':')) {
+                indent += "    ";
+            }
+            
+            this.value = this.value.substring(0, start) +
+              "\n" + indent + this.value.substring(end);
+            
+            // Put caret at right position again
+            this.selectionStart = this.selectionEnd = start + indent.length + 1;
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', (event) => {
+      // Initialize highlight.js
+      document.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightBlock(block);
+      });
+    });
+    </script>
+    <style>
+      body {
+        background-color: black;
+        color: white;
+      }
+      
+      #input-area, #output-area {
+          background-color: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 0.25rem;
+          padding: 1rem;
+          min-height: 150px; /* Adjust as needed */
+      }
+      
+      #output {
+          white-space: pre-wrap;
+          word-break: break-word;
+          line-height: 1.5;
+      }
+
+      h3 + pre {
+        background-color: #1e1e1e;  /* Dark background */
+        border: 1px solid #333;
+        border-radius: 0.25rem;
+        padding: 0.5rem;
+      }
+
+      h3 + pre,
+      h3 + pre code {
+        color: #ffffff !important;  /* White text color with !important */
+      }
+
+      .hljs {
+        color: #ffffff !important;
+        background: transparent !important;
+      }
+
+      pre, code {
+        color: #ffffff !important;  /* Light text color */
+      }
+      .form-group {
+          margin-bottom: 1rem;
+      }
+      
+      pre {
+          background-color: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 0.25rem;
+          padding: 0.5rem;
+      }
+
+      .btn-secondary {
+        background-color: #444;
+        border-color: #555;
+      }
+
+      .btn-secondary:hover {
+        background-color: #555;
+        border-color: #666;
+      }
+
+      h1, h2, h3, h4, h5, h6, p {
+        color: white;
+      }
+      .form-control {
+        background-color: #333;
+        border-color: #555;
+        color: white;
+      }
+
+      .form-control:focus {
+        background-color: #444;
+        border-color: #666;
+        color: white;
+      }
+      
+      #output-area pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.5;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </body>
+</html>
+{% endblock %}

@@ -1,0 +1,615 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% csrf_token %}
+<div id="fullscreen-prompt" class="container text-center mt-5">
+    <h1>Welcome to Code Quest</h1>
+    <p>Please enter fullscreen mode to view the rounds.</p>
+    <button id="fullscreenButton" class="btn btn-primary btn-lg mt-3">Enter Fullscreen</button>
+</div>
+
+<div id="content-area" style="display: none;">
+    <div class="container mt-5">
+        <h1 class="mb-4" id="main-title">Competition Rounds</h1>
+        <!--<p>Your current score: <span id="user-score">{{ user_score }}</span></p> -->
+        <button id="refresh-button" class="btn btn-info mb-3">Refresh</button>
+        <div id="rounds-list">
+            {% if rounds %}
+                <div class="list-group">
+                    {% for round in rounds %}
+                        <a href="#" class="list-group-item list-group-item-action round-link" data-round-id="{{ round.id }}">
+                            <h5 class="mb-1">{{ round.name }}</h5>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info" role="alert">
+                    No rounds are currently active. Please check back later.
+                </div>
+            {% endif %}
+        </div>
+        <div id="questions-list" style="display: none;">
+            <a href="#" class="btn btn-secondary mb-3" id="back-to-rounds">Back to Rounds</a>
+            <div class="list-group">
+                <!-- Questions will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="question-detail" class="container mt-5" style="display: none;">
+    <button id="back-to-questions" class="btn btn-secondary mb-3">Back to Questions</button>
+    <div class="row">
+        <div class="col-md-6">
+            <h2 id="question-title"></h2>
+            <p id="question-description"></p>
+            <h3>Input Format</h3>
+            <p id="input-format"></p>
+            <h3>Output Format</h3>
+            <p id="output-format"></p>
+        </div>
+        <div class="col-md-6">
+            <h3>Sample Input</h3>
+            <pre id="sample-input"></pre>
+            <h3>Sample Output</h3>
+            <pre id="sample-output"></pre>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label for="input-area">Input:</label>
+                <textarea id="input-area" class="form-control" rows="10"></textarea>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label for="output-area">Output:</label>
+                <textarea id="output-area" class="form-control" rows="10" readonly></textarea>
+            </div>
+        </div>
+    </div>
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="form-group">
+                <label for="code-area">Your Code:</label>
+                <div id="editor"></div>
+            </div>
+            <button id="run-code" class="btn btn-primary mt-3">Run Code</button>
+            <button id="submit-code" class="btn btn-success mt-3 ml-2">Submit Code</button>
+        </div>
+    </div>
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>Submission Results:</h3>
+            <div id="submission-results"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', (event) => {
+    console.log('DOM fully loaded and parsed');
+    const fullscreenPrompt = document.getElementById('fullscreen-prompt');
+    const contentArea = document.getElementById('content-area');
+    const fullscreenButton = document.getElementById('fullscreenButton');
+    const roundsList = document.getElementById('rounds-list');
+    const questionsList = document.getElementById('questions-list');
+    const backToRoundsButton = document.getElementById('back-to-rounds');
+    const questionDetail = document.getElementById('question-detail');
+    const mainTitle = document.getElementById('main-title');
+    const refreshButton = document.getElementById('refresh-button');
+    //const userScoreSpan = document.getElementById('user-score');
+    const csrftoken = getCookie('csrftoken');
+    let editor;
+    let autoSaveInterval; 
+    let currentQuestionId = null;
+
+
+    if (!questionsList) {
+        console.error('Questions list element not found');
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    
+
+    function fetchWithCSRF(url, options = {}) {
+        const fetchOptions = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'X-CSRFToken': csrftoken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'include'
+        };
+        return fetch(url, fetchOptions);
+    }
+
+    function refreshContent() {
+        console.log('Refreshing content');
+        fetchWithCSRF('/refresh-content/', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Received refresh data:', data);
+            
+            // Update rounds
+            const roundsListGroup = roundsList.querySelector('.list-group');
+            if (roundsListGroup) {
+                roundsListGroup.innerHTML = data.rounds.map(round => `
+                    <a href="#" class="list-group-item list-group-item-action round-link" data-round-id="${round.id}">
+                        <h5 class="mb-1">${round.name}</h5>
+                    </a>
+                `).join('');
+                addRoundLinkListeners();
+            }
+
+            // Update user score
+            //userScoreSpan.textContent = data.user_score;
+
+            // If there are no rounds, show the "no rounds" message
+            if (data.rounds.length === 0) {
+                roundsList.innerHTML = `
+                    <div class="alert alert-info" role="alert">
+                        No rounds are currently active. Please check back later.
+                    </div>
+                `;
+            }
+
+            // If we're currently viewing questions for a round, refresh those too
+            if (questionsList.style.display !== 'none') {
+                const currentRoundId = questionsList.dataset.currentRoundId;
+                if (currentRoundId) {
+                    loadRoundQuestions(currentRoundId);
+                }
+            }
+        })
+        .catch(error => console.error('Error refreshing content:', error));
+    }
+
+    function formatTime(ms) {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        return [
+            hours.toString().padStart(2, '0'),
+            (minutes % 60).toString().padStart(2, '0'),
+            (seconds % 60).toString().padStart(2, '0')
+        ].join(':');
+    }
+
+    function addRoundLinkListeners() {
+        console.log('Adding round link listeners');
+        document.querySelectorAll('.round-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const roundId = e.target.closest('.round-link').dataset.roundId;
+                console.log('Round link clicked, ID:', roundId);
+                loadRoundQuestions(roundId);
+            });
+        });
+    }
+
+    function loadRoundQuestions(roundId) {
+        console.log('Loading questions for round:', roundId);
+        fetchWithCSRF(`/round/${roundId}/`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Received data:', data);
+            const questionsHtml = data.questions.map(question => `
+                <a href="#" class="list-group-item list-group-item-action question-link ${question.is_solved ? 'list-group-item-success disabled' : ''}" data-question-id="${question.id}">
+                    <h5 class="mb-1">${question.title}</h5>
+                    ${question.is_solved ? '<span class="badge badge-success">Solved</span>' : ''}
+                </a>
+            `).join('');
+
+            const questionsListGroup = questionsList.querySelector('.list-group');
+
+            if (questionsListGroup) {
+                questionsListGroup.innerHTML = questionsHtml;
+            } else {
+                console.error('Questions list group not found');
+            }
+
+            mainTitle.textContent = `${data.round}`;
+        
+            roundsList.style.display = 'none';
+            questionsList.style.display = 'block';
+            questionsList.dataset.currentRoundId = roundId;
+            questionDetail.style.display = 'none';
+
+            addQuestionLinkListeners();
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function setupBackToRoundsButton() {
+        backToRoundsButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            roundsList.style.display = 'block';
+            questionsList.style.display = 'none';
+            questionDetail.style.display = 'none';
+            mainTitle.textContent = 'Competition Rounds';
+        });
+    }
+
+    function addQuestionLinkListeners() {
+        document.querySelectorAll('.question-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!e.target.closest('.question-link').classList.contains('disabled')) {
+                    const questionId = e.target.closest('.question-link').dataset.questionId;
+                    loadQuestionDetail(questionId);
+                }
+            });
+        });
+    }
+
+    
+
+    function loadQuestionDetail(questionId) {
+        console.log('Loading question detail for ID:', questionId);
+        fetchWithCSRF(`/question/${questionId}/`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Received question data:', data);
+            document.getElementById('question-title').textContent = data.title;
+            document.getElementById('question-description').textContent = data.description;
+            document.getElementById('input-format').textContent = data.input_format;
+            document.getElementById('output-format').textContent = data.output_format;
+            document.getElementById('sample-input').textContent = data.sample_input;
+            document.getElementById('sample-output').textContent = data.sample_output;
+
+            if (typeof ace !== 'undefined') {
+                if (!editor) {
+                    editor = ace.edit("editor");
+                    editor.setTheme("ace/theme/monokai");
+                    editor.session.setMode("ace/mode/python");
+                    editor.setFontSize("16px");
+                }
+                editor.setValue(data.submission_code || '');
+                const savedCode = localStorage.getItem(`code_${questionId}`) || data.submission_code || '';
+                editor.setValue(savedCode);
+                
+                // Set up auto-save
+                if (autoSaveInterval) {
+                    clearInterval(autoSaveInterval);
+                }
+                autoSaveInterval = setInterval(() => {
+                    const code = editor.getValue();
+                    localStorage.setItem(`code_${questionId}`, code);
+                }, 5000);
+            
+            } else {
+                console.warn('Ace editor not available. Falling back to textarea.');
+                const editorElement = document.getElementById('editor');
+                if (editorElement) {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = data.submission_code || '';
+                    textarea.className = 'form-control';
+                    textarea.rows = 10;
+                    textarea.style.fontSize = '16px';
+                    editorElement.parentNode.replaceChild(textarea, editorElement);
+
+                    if (autoSaveInterval) {
+                        clearInterval(autoSaveInterval);
+                    }
+                    autoSaveInterval = setInterval(() => {
+                        const code = textarea.value;
+                        localStorage.setItem(`code_${questionId}`, code);
+                    }, 5000);
+                }
+            }
+
+            questionsList.style.display = 'none';
+            questionDetail.style.display = 'block';
+
+            // Add event listeners for run and submit buttons
+            document.getElementById('run-code').addEventListener('click', () => runCode(questionId));
+            const submitButton = document.getElementById('submit-code');
+            document.getElementById('submit-code').addEventListener('click', () => submitCode(questionId));
+
+            if (data.is_solved) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Already Solved';
+            } else {
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Submit Code';
+            }
+
+            // Setup back to questions button
+            document.getElementById('back-to-questions').addEventListener('click', () => {
+                //stopStopwatch(questionId);
+                showQuestionsList();
+                //refreshContent();
+            });
+
+            // Start or resume the stopwatch for this question
+           // startStopwatch(questionId);
+        })
+        .catch(error => console.error('Error loading question detail:', error));
+    }
+
+    function showQuestionsList() {
+        questionDetail.style.display = 'none';
+        questionsList.style.display = 'block';
+    }
+
+    function getCode() {
+        if (editor) {
+            return editor.getValue();
+        } else {
+            const textarea = document.querySelector('#editor textarea');
+            return textarea ? textarea.value : '';
+        }
+    }
+
+    function runCode(questionId) {
+        const code = getCode();
+        const input = document.getElementById('input-area').value;
+        const outputArea = document.getElementById('output-area');
+        
+        console.log('Running code:', code);
+        console.log('Input:', input);
+
+        outputArea.textContent = 'Running code...';
+        
+        fetchWithCSRF(`/question/${questionId}/run/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ code: code, input: input })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Received data:', data);
+            if (data.output !== undefined) {
+                // Remove any trailing newline and display the output
+                outputArea.textContent = data.output.trimEnd();
+            } else if (data.error) {
+                outputArea.textContent = 'Error';
+            } else {
+                outputArea.textContent = 'Unexpected response from server';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            outputArea.textContent = 'An error occurred while running the code';
+        });
+    }
+
+    function submitCode(questionId) {
+        const code = getCode();
+        
+        fetchWithCSRF(`/question/${questionId}/submit/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ code: code })
+        })
+        .then(response => response.json())
+        .then(data => {
+            displayResults(data);
+            if (data.all_correct) {
+                // If the submission is correct, clear the saved code and disable the submit button
+                localStorage.removeItem(`code_${questionId}`);
+                const submitButton = document.getElementById('submit-code');
+                submitButton.disabled = true;
+                submitButton.textContent = 'Already Solved';
+
+                //setTimeout(() => {
+                //showQuestionsList();
+                // Refresh the content
+              //  refreshContent();
+            //}, 100);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            displayResults({ success: false, message: 'An error occurred while submitting the code.', all_correct: false });
+            //startStopwatch(questionId);
+        });
+    }
+    function displayResults(data) {
+        const resultsArea = document.getElementById('submission-results');
+        let resultHTML = `<h4>${data.message}</h4>`;
+        resultHTML += `<p><strong>Status:</strong> ${data.all_correct ? 'All Correct' : 'Incorrect'}</p>`;
+        resultsArea.innerHTML = resultHTML;
+    }
+
+    function hideContent() {
+        contentArea.style.display = 'none';
+        fullscreenPrompt.style.display = 'block';
+    }
+
+    function disableContextMenu(event) {
+        event.preventDefault();
+    }
+
+    function handleVisibilityChange() {
+        if (document.hidden && document.fullscreenElement) {
+            alert('You have switched tabs. Please stay on the current tab.');
+        }
+    }
+
+    function toggleFullscreenMode(enabled) {
+        if (enabled) {
+            document.addEventListener('contextmenu', disableContextMenu);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        } else {
+            document.removeEventListener('contextmenu', disableContextMenu);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        }
+    }
+
+    fullscreenButton.addEventListener('click', () => {
+        console.log('Attempting to enter fullscreen');
+        document.documentElement.requestFullscreen().then(() => {
+            console.log('Fullscreen entered successfully');
+            fullscreenPrompt.style.display = 'none';
+            contentArea.style.display = 'block';
+            toggleFullscreenMode(true);
+        }).catch((error) => {
+            console.error('Error attempting to enter fullscreen:', error);
+        });
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) {
+            hideContent();
+            // Perform silent logout
+            fetchWithCSRF('/logout/', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Redirect to login page
+                    window.location.href = '/accounts/login/';
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    });
+
+    refreshButton.addEventListener('click', refreshContent);
+
+    // Initial setup
+    addRoundLinkListeners();
+    setupBackToRoundsButton();
+    hideContent(); // Ensure content is hidden initially
+});
+</script>
+
+<style>
+#fullscreenButton {
+    background-color: #0e08aa;
+    border-color: #0056b3;
+}
+
+#fullscreenButton:hover {
+    background-color: #0e08aa;
+    border-color: #003d80;
+}
+
+#refresh-button {
+    background-color: #0e08aa;
+    border-color: #17a2b8;
+}
+
+#refresh-button:hover {
+    background-color: #0e08aa;
+    border-color: #117a8b;
+}
+
+.list-group-item-action:hover {
+    background-color: #f8f9fa;
+}
+
+.container {
+    max-width: 800px;
+}
+
+h1 {
+    color: #00e5ff;
+}
+
+.alert-info {
+    background-color: #e1f5fe;
+    border-color: #b3e5fc;
+    color: #0277bd;
+}
+
+.list-group-item-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+#question-detail {
+    margin-top: 2rem;
+}
+
+.question-link, .round-link {
+    transition: background-color 0.2s;
+}
+
+.question-link:hover, .round-link:hover {
+    background-color: #e9ecef;
+}
+
+.question-link.disabled {
+        pointer-events: none;
+        opacity: 0.6;
+    }
+
+.badge-success {
+    background-color: #28a745;
+    color: white;
+    padding: 0.25em 0.4em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+    margin-left: 0.5rem;
+}
+
+#editor {
+    height: 300px;
+    margin-bottom: 1rem;
+    font-size: 16px;
+}
+
+#input-area{
+    font-family: monospace;
+    font-size: 14px;
+}
+
+#output-area {
+    font-family: monospace;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    background-color: #f8f9fa;
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin: 0;  
+}
+
+</style>
+{% endblock %}

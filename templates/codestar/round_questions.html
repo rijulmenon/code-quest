@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">{{ round.name }} Questions</h1>
+    <a href="{% url 'home' %}" class="btn btn-secondary mb-3">Back to Rounds</a>
+    {% if questions %}
+        <div class="list-group">
+            {% for question in questions %}
+                <a href="#" class="list-group-item list-group-item-action question-link" data-question-id="{{ question.id }}">
+                    <h5 class="mb-1">{{ question.title }}</h5>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info" role="alert">
+            No questions available for this round at the moment.
+        </div>
+    {% endif %}
+</div>
+
+<div id="question-detail" class="container mt-5" style="display: none;">
+    <!-- Question details will be loaded here -->
+</div>
+
+<script>
+let stopwatches = {};
+let currentQuestionId = null;
+let currentUser = "{{ request.user.username }}";
+let solvedQuestions = JSON.parse(localStorage.getItem('solvedQuestions_' + currentUser)) || {};
+
+document.addEventListener('DOMContentLoaded', (event) => {
+    const questionList = document.querySelector('.list-group');
+    const questionDetail = document.getElementById('question-detail');
+
+    // Load question details
+    document.querySelectorAll('.question-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const questionId = e.target.closest('.question-link').dataset.questionId;
+            if (solvedQuestions[questionId]) {
+                alert('You have already solved this question!');
+            } else {
+                loadQuestionDetail(questionId);
+            }
+        });
+    });
+
+    // Update question list colors on initial load
+    updateQuestionListColors();
+});
+
+document.addEventListener('DOMContentLoaded', (event) => {
+    const questionList = document.querySelector('.list-group');
+    const questionDetail = document.getElementById('question-detail');
+
+    // Load question details
+    document.querySelectorAll('.question-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const questionId = e.target.closest('.question-link').dataset.questionId;
+            loadQuestionDetail(questionId);
+        });
+    });
+});
+
+function loadQuestionDetail(questionId) {
+    if (currentQuestionId) {
+        pauseStopwatch(currentQuestionId); // Pause the current stopwatch
+    }
+    currentQuestionId = questionId; // Set the current question ID
+
+    fetch(`/codestar/question/${questionId}/`)
+        .then(response => response.json())
+        .then(data => {
+            const questionDetail = document.getElementById('question-detail');
+            questionDetail.style.display = 'block';
+            questionDetail.innerHTML = `
+                <h2>${data.title}</h2>
+                <p>${data.description}</p>
+                <div id="stopwatch" class="mb-3">Time: 00:00:00</div>
+                <button class="btn btn-secondary mb-3" onclick="showQuestionList()">Back to Questions</button>
+                <textarea id="code-area" class="form-control" rows="10">${data.submission_code || ''}</textarea>
+                <button class="btn btn-primary mt-3" onclick="runCode(${questionId})">Run Code</button>
+                <button class="btn btn-success mt-3" onclick="submitCode(${questionId})">Submit Code</button>
+            `;
+
+            // Start the stopwatch for this question
+            startStopwatch(questionId);
+        });
+}
+
+function startStopwatch(questionId) {
+    if (!stopwatches[questionId]) {
+        stopwatches[questionId] = {
+            startTime: Date.now(),
+            elapsedTime: 0,
+            interval: null
+        };
+    }
+
+    const stopwatch = stopwatches[questionId];
+    stopwatch.interval = setInterval(() => {
+        const currentTime = Date.now();
+        stopwatch.elapsedTime = currentTime - stopwatch.startTime + stopwatch.elapsedTime;
+        updateStopwatchDisplay(questionId);
+    }, 1000);
+}
+
+function pauseStopwatch(questionId) {
+    if (stopwatches[questionId]) {
+        clearInterval(stopwatches[questionId].interval);
+        stopwatches[questionId].elapsedTime += Date.now() - stopwatches[questionId].startTime;
+    }
+}
+
+function updateStopwatchDisplay(questionId) {
+    const stopwatch = stopwatches[questionId];
+    const seconds = Math.floor(stopwatch.elapsedTime / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    const displayTime = `${hours.toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+    document.getElementById('stopwatch').textContent = `Time: ${displayTime}`;
+}
+
+function showQuestionList() {
+    const questionList = document.querySelector('.list-group');
+    const questionDetail = document.getElementById('question-detail');
+    questionDetail.style.display = 'none';
+    questionList.style.display = 'block';
+    if (currentQuestionId) {
+        pauseStopwatch(currentQuestionId); // Pause the stopwatch when going back to the list
+    }
+}
+
+function submitCode(questionId) {
+    const code = document.getElementById('code-area').value;
+    pauseStopwatch(questionId); // Pause the stopwatch before submitting
+
+    const elapsedTime = stopwatches[questionId] ? stopwatches[questionId].elapsedTime / 1000 : 0; // Convert to seconds
+
+    fetchWithCSRF(`/question/${questionId}/submit/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ code: code, time_taken: elapsedTime })
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        // Optionally, handle the response and update the UI
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function showQuestionList() {
+    const questionList = document.querySelector('.list-group');
+    const questionDetail = document.getElementById('question-detail');
+    questionDetail.style.display = 'none';
+    questionList.style.display = 'block';
+    if (currentQuestionId) {
+        pauseStopwatch(currentQuestionId); // Pause the stopwatch when going back to the list
+    }
+}
+
+function updateQuestionListColors() {
+    document.querySelectorAll('.question-link').forEach(link => {
+        const questionId = link.dataset.questionId;
+        if (solvedQuestions[questionId]) {
+            link.classList.add('list-group-item-success');
+            link.style.pointerEvents = 'none';
+            link.style.cursor = 'default';
+        } else {
+            link.classList.remove('list-group-item-success');
+            link.style.pointerEvents = 'auto';
+            link.style.cursor = 'pointer';
+        }
+    });
+}
+
+function startStopwatch(questionId) {
+    if (!stopwatches[questionId]) {
+        stopwatches[questionId] = {
+            startTime: Date.now(),
+            elapsedTime: 0,
+            interval: null
+        };
+    }
+
+    const stopwatch = stopwatches[questionId];
+    stopwatch.interval = setInterval(() => {
+        const currentTime = Date.now();
+        stopwatch.elapsedTime = currentTime - stopwatch.startTime + stopwatch.elapsedTime;
+        updateStopwatchDisplay(questionId);
+    }, 1000);
+}
+
+function pauseStopwatch(questionId) {
+    if (stopwatches[questionId]) {
+        clearInterval(stopwatches[questionId].interval);
+        stopwatches[questionId].elapsedTime += Date.now() - stopwatches[questionId].startTime;
+    }
+}
+
+function updateStopwatchDisplay(questionId) {
+    const stopwatch = stopwatches[questionId];
+    const seconds = Math.floor(stopwatch.elapsedTime / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    const displayTime = `${hours.toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+    document.getElementById('stopwatch').textContent = `Time: ${displayTime}`;
+}
+
+function handleCodeAreaKeydown(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 4;
+    }
+}
+
+function runCode(questionId, editor) {
+    const code = editor.getValue();
+    const input = document.getElementById('input-area').value;
+    
+    fetchWithCSRF(`/question/${questionId}/run/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ code: code, input: input })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('output-area').textContent = data.output;
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function submitCode(questionId) {
+    const code = document.getElementById('code-area').value;
+    pauseStopwatch(questionId); // Pause the stopwatch before submitting
+
+    const elapsedTime = stopwatches[questionId] ? stopwatches[questionId].elapsedTime / 1000 : 0; // Convert to seconds
+
+    fetchWithCSRF(`/question/${questionId}/submit/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ code: code, time_taken: elapsedTime })
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        // Optionally, handle the response and update the UI
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
+<style>
+#input-area, #output-area {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 1rem;
+    min-height: 150px;
+}
+
+#output-area {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+pre {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+}
+
+#stopwatch {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.list-group-item-success {
+    color: #155724;
+    background-color: #d4edda;
+    opacity: 0.7;
+}
+
+.list-group-item-success:hover {
+    color: #155724;
+    background-color: #d4edda;
+}
+</style>
+{% endblock %}
